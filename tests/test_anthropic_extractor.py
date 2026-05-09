@@ -97,9 +97,7 @@ def test_strips_markdown_fences_if_model_emits_them(extractor: AnthropicExtracto
     # and we fall back to deny-most. Future work: strip the fences.
     extractor._client.messages.create.return_value = SimpleNamespace(
         content=_content(
-            "```json\n"
-            + json.dumps({"summary": "x", "allowed_tools": ["a"]})
-            + "\n```"
+            "```json\n" + json.dumps({"summary": "x", "allowed_tools": ["a"]}) + "\n```"
         )
     )
     intent, _ = extractor.extract("anything")

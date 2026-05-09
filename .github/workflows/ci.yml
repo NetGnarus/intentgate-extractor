@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: ruff + pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Pytest
+        env:
+          EXTRACTOR_STUB: "true"
+        run: pytest -q
+
+  docker:
+    name: docker build + healthz smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: intentgate/extractor:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run image and probe /healthz
+        run: |
+          docker run -d --rm --name ext -p 8090:8090 -e EXTRACTOR_STUB=true intentgate/extractor:ci
+          for i in 1 2 3 4 5 6 7 8; do
+            if curl -sf http://localhost:8090/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -sf http://localhost:8090/healthz | grep -q '"status":"ok"' \
+            || (echo "::error::container /healthz did not return ok"; docker logs ext; docker stop ext; exit 1)
+          echo "--- /v1/extract smoke (stub mode):"
+          curl -sf -X POST http://localhost:8090/v1/extract \
+            -H 'Content-Type: application/json' \
+            -d '{"prompt":"Process today AP invoices","agent_id":"finance-copilot-v3"}' \
+            | grep -q '"allowed_tools"' \
+            || (echo "::error::/v1/extract did not include allowed_tools"; docker logs ext; docker stop ext; exit 1)
+          docker stop ext

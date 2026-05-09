@@ -58,7 +58,7 @@ def extract(req: ExtractRequest) -> ExtractResponse:
         intent, latency_ms = _extractor.extract(req.prompt)
     except Exception as e:  # pragma: no cover — depends on Anthropic SDK
         logger.exception("extraction failed")
-        raise HTTPException(status_code=500, detail=f"extraction failed: {e!s}")
+        raise HTTPException(status_code=500, detail=f"extraction failed: {e!s}") from e
 
     logger.info(
         "extracted prompt (agent=%s, tools_allow=%d, tools_deny=%d, conf=%.2f, latency=%dms)",
