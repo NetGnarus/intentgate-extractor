@@ -19,7 +19,7 @@ classifiers = [
 ]
 dependencies = [
   "fastapi>=0.110,<0.116",
-  "uvicorn[standard]>=0.27,<0.32",
+  "uvicorn[standard]>=0.27,<0.50",
   "pydantic>=2.5,<3",
   "anthropic>=0.34,<1",
 ]
